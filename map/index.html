@@ -16,6 +16,10 @@
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"
         />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.css"
+        />
         <style>
             body,
             html {
@@ -133,19 +137,35 @@
         <div id="map"></div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
         <script>
-            const map = L.map("map").setView([44.0, 10.0], 6);
+            // maxZoom must be set explicitly: the MapLibre GL basemap layer does not
+            // report one to Leaflet, and markercluster requires map.getMaxZoom().
+            const map = L.map("map", { maxZoom: 19 }).setView([44.0, 10.0], 6);
             const loader = document.getElementById("loader");
 
-            L.tileLayer(
-                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                {
+            // OpenFreeMap Positron — free, no API key, no usage limits, minimal light theme.
+            // Falls back to a keyless raster basemap if MapLibre GL is unavailable.
+            try {
+                if (typeof L.maplibreGL !== "function" || !window.maplibregl) {
+                    throw new Error("MapLibre GL not loaded");
+                }
+                L.maplibreGL({
+                    style: "https://tiles.openfreemap.org/styles/positron",
                     attribution:
-                        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-                    subdomains: "abcd",
-                    maxZoom: 20,
-                },
-            ).addTo(map);
+                        '&copy; <a href="https://openfreemap.org">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                }).addTo(map);
+            } catch (e) {
+                console.error("MapLibre basemap failed, using raster fallback:", e);
+                L.tileLayer(
+                    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+                    {
+                        attribution: "Tiles &copy; Esri",
+                        maxZoom: 16,
+                    },
+                ).addTo(map);
+            }
 
             const markers = L.markerClusterGroup({
                 showCoverageOnHover: false,
@@ -207,7 +227,10 @@
                 })
                 .catch((error) => {
                     console.error("Error loading the places data:", error);
-                    loader.innerHTML = `Error loading data: ${error.message}`;
+                    const msg =
+                        (error && (error.message || error.toString())) ||
+                        String(error);
+                    loader.innerHTML = `Error loading data: ${msg}`;
                     loader.style.color = "red";
                 });
 
